@@ -43,7 +43,8 @@ class Get:
     def set_url(self):
         self.url = input("Enter URL: ")
 
-    def is_playlist(self, info):
+    @staticmethod
+    def is_playlist(info):
         if info.get('entries') and isinstance(info.get('entries'), list):
             return True
         return False
@@ -62,6 +63,14 @@ class Get:
 
         return data
 
+def extract_video_info(url):
+    options = {
+        'quiet': True
+    }
+    with yt_dlp.YoutubeDL(options) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    return info
 def get_formats(info) -> list:
 
     print("\nAvailable formats:")
@@ -104,13 +113,15 @@ def check_format_availability(url, format_id):
         formats = [fmt['format_id'] for fmt in info['formats']]
     return format_id in formats
 
-def list_playlist_videos(url, info):
+def list_playlist_videos(info):
 
     print("\nPlaylist contents:")
+    video_data = {}
     for idx, entry in enumerate(info['entries'], start=1):
         print(f"{idx}. {entry['title']}")
+        video_data[idx] = extract_video_info(entry['original_url'])
 
-    return info.get('entries')
+    return video_data
 
 def download_video(url, format_id, save_dir, idx, title):
 
@@ -128,8 +139,8 @@ def download_video(url, format_id, save_dir, idx, title):
 
 def get_videos_to_download():
 
+    videos_to_download = []
     try:
-        videos_to_download = []
         videos = input("Enter index of video download. \nEnter comma separated values and range. \nEg: 1,2,3-7,12\n")
         for i in videos.split(','):
             if '-' in i:
@@ -153,26 +164,33 @@ if __name__ == "__main__":
     if data_object.playlist:
         data_object.videos = list_playlist_videos(data_object.get_info())
     else:
-        data_object.videos = [{'url':data_object.info.get('original_url')}]
+        temp = data_object.info
+        temp['url'] = data_object.info.get('original_url')
+        data_object.videos = [temp]
+        del temp
 
     to_download = get_videos_to_download()
-    selected_videos = [video['url'] for video in data_object.videos]
-    print("\nSelect a resolution for all videos:")
+    selected_videos = [data_object.videos[i] for i in to_download]
+    print("\nSelect a resolution for video:")
+    # with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+    #     temp_info = ydl.extract_info(selected_videos[0], download=False)
+    # formats = get_formats(temp_info)
     formats = get_formats(selected_videos[0])
     if formats:
         format_id = input("Enter the format ID you wish to download: ")
     else:
         print("No suitable formats found.")
+        sys.exit(0)
     
     skipped_videos = []
     for idx, video_url in enumerate(selected_videos, start=1):
-        video_title = data_object.videos[idx - 1]['title']
+        video_title = data_object.videos[idx]['title']
         print(f"\nChecking format availability for {video_title}...")
 
         # Check if the selected format is available for the video
-        if check_format_availability(video_url, format_id):
+        if check_format_availability(video_url.get('original_url'), format_id):
             print(f"Downloading {video_title} in format {format_id}...")
-            download_video(video_url, format_id, os.getcwd(), idx, video_title)
+            download_video(video_url.get('original_url'), format_id, os.getcwd(), idx, video_title)
         else:
             print(f"Skipped {video_title}: Requested format {format_id} is not available.")
             skipped_videos.append((video_url, video_title, idx))  # Store skipped videos
@@ -187,7 +205,7 @@ if __name__ == "__main__":
                 formats = get_formats(video_url)
                 if formats:
                     new_format_id = input(f"Enter the format ID for {video_title}: ")
-                    if check_format_availability(video_url, new_format_id):
+                    if check_format_availability(video_url.get('original_url'), new_format_id):
                         print(f"Retrying download for {video_title} with format {new_format_id}...")
                         download_video(video_url, new_format_id, os.getcwd(), idx, video_title)
                     else:
