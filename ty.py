@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
 import yt_dlp
 import re
@@ -46,7 +47,7 @@ class Get:
 
     @staticmethod
     def is_playlist(info: Dict):
-        if info.get('entries') and isinstance(info.get('entries'), list):
+        if info.get('entries'):
             return True
         return False
 
@@ -54,13 +55,18 @@ class Get:
         options = {
             'quiet': True
         }
-        with yt_dlp.YoutubeDL(options) as ydl:
-            info = ydl.extract_info(self.url, download=False)
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(self.url, download=False)
 
-        data = Data()
-        data.set_url(self.url)
-        data.set_info(info)
-        data.set_playlist_status(self.is_playlist(info))
+            data = Data()
+            data.set_url(self.url)
+            data.set_info(info)
+            data.set_playlist_status(self.is_playlist(info))
+
+        except Exception as invalid_url:
+            print(f"Invalid Url: {invalid_url}")
+            sys.exit(0)
 
         return data
 
@@ -69,8 +75,12 @@ def extract_video_info(url: str) -> Dict:
     options = {
         'quiet': True
     }
-    with yt_dlp.YoutubeDL(options) as ydl:
-        info = ydl.extract_info(url, download=False)
+    try:
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as invalid_url:
+        print(f"Invalid Url: {invalid_url}")
+        sys.exit(0)
 
     return info
 
@@ -80,7 +90,7 @@ def get_formats(info: Dict) -> List:
     filtered_formats = []
     for i in range(len(info["formats"])):
         if 'ext' in info["formats"][i].keys() and info["formats"][i].get('ext') == 'mp4':
-            if info["formats"][i].get('height') in [1080, 720, 480]:
+            if info["formats"][i].get('height') in [1080, 720, 480] or info['formats'][i].get('quality') in ['360', '720', '1080']:
                 filtered_formats.append(info["formats"][i])
                 f_id = info["formats"][i].get('format_id')
                 resolution = info["formats"][i].get('resolution')
@@ -104,6 +114,21 @@ def check_format_availability(url: str, frmt_id: str) -> bool:
     return frmt_id in [fmt['format_id'] for fmt in info['formats']]
 
 
+# def list_playlist_videos(info: Dict) -> Dict:
+#     """
+
+#     :param info: Dict
+#     :return :
+
+#     return type is a dictionary with keys as index and values is another dictionary
+#     """
+#     print("\nPlaylist contents:")
+#     video_data = {}
+#     for i, entry in enumerate(info['entries'], start=1):
+#         print(f"{i}. {entry['title']}")
+#         video_data[i] = extract_video_info(entry['original_url'])
+
+#     return video_data
 def list_playlist_videos(info: Dict) -> Dict:
     """
 
@@ -112,14 +137,29 @@ def list_playlist_videos(info: Dict) -> Dict:
 
     return type is a dictionary with keys as index and values is another dictionary
     """
+
+    def extract_video_data(i, entry):
+        return i, extract_video_info(entry['original_url'])
+
     print("\nPlaylist contents:")
     video_data = {}
-    for i, entry in enumerate(info['entries'], start=1):
-        print(f"{i}. {entry['title']}")
-        video_data[i] = extract_video_info(entry['original_url'])
+
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for i, entry in enumerate(info['entries'], start=1):
+            print(f"{i}. {entry['title']}")
+            print(f"Thread {i} started")
+            futures.append(executor.submit(extract_video_data, i, entry))
+        
+        for future in as_completed(futures):
+            try:
+                i, data = future.result()
+                print(f"Thread {i} Ended.")
+                video_data[i] = data
+            except Exception as te:
+                print(f"Error fetching data for video {i}: {te}")
 
     return video_data
-
 
 def download_video(url: str, format_idx, save_dir, video_number, title) -> None:
     """
@@ -141,7 +181,9 @@ def download_video(url: str, format_idx, save_dir, video_number, title) -> None:
         ydl.download([url])
 
 
-def get_videos_to_download() -> List:
+def get_videos_to_download(folder: bool) -> List:
+    if not folder:
+        return [0]
     videos_to_download = []
     try:
         videos = input("Enter index of video download. \nEnter comma separated values and range. \nEg: 1,2,3-7,12\n")
@@ -158,8 +200,8 @@ def get_videos_to_download() -> List:
     finally:
         return videos_to_download
 
+def main():
 
-if __name__ == "__main__":
     g = Get()
     g.set_url()
     data_object = g.extract_info()
@@ -172,20 +214,26 @@ if __name__ == "__main__":
         data_object.videos = [temp]
         del temp
 
-    to_download = get_videos_to_download()
+    to_download = get_videos_to_download(data_object.playlist)
     selected_videos = [data_object.videos[i] for i in to_download]
     print("\nSelect a resolution for video:")
 
     formats = get_formats(selected_videos[0])
+
     if formats:
         format_id = input("Enter the format ID you wish to download: ")
+        try:
+            int(format_id)
+        except ValueError as v:
+            print(f"Invalid Format, {v}")
+            sys.exit(0)
     else:
         print("No suitable formats found.")
         sys.exit(0)
 
     skipped_videos = []
     for idx, video_url in enumerate(selected_videos, start=1):
-        video_title = data_object.videos[idx]['title']
+        video_title = data_object.videos[idx-1]['title']
         print(f"\nChecking format availability for {video_title}...")
 
         # Check if the selected format is available for the video
@@ -213,3 +261,6 @@ if __name__ == "__main__":
                         print(f"Format {new_format_id} is still not available for {video_title}. Skipping.")
                 else:
                     print(f"No available formats for {video_title}.")
+
+if __name__ == "__main__":
+    main()
