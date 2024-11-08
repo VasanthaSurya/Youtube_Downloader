@@ -1,0 +1,59 @@
+/* Custom Fonts and Colors */
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f8f9fa;
+}
+
+/* Navbar Tweaks */
+.navbar {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+    color: #007bff !important;
+}
+
+/* Section Headings */
+h2 {
+    font-family: 'Georgia', serif;
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+/* Skills Section */
+.skills-grid .skill {
+    transition: transform 0.3s;
+}
+.skills-grid .skill:hover {
+    transform: scale(1.1);
+    background-color: #007bff;
+    color: #fff;
+}
+
+/* Project Cards */
+.card {
+    transition: box-shadow 0.3s;
+}
+.card:hover {
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Footer Styling */
+footer {
+    background-color: #343a40;
+    color: #ffffff;
+    padding: 1rem;
+    font-size: 0.9rem;
+}
+
+/* Button Styling */
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
