@@ -1,3 +1,4 @@
+from typing import List, Dict
 import yt_dlp
 import re
 import os
@@ -11,22 +12,22 @@ class Data:
         self.videos = {}
         self.playlist = False
 
-    def set_url(self, url):
+    def set_url(self, url: str):
         self.url = url
-        
-    def get_url(self):
+
+    def get_url(self) -> str:
         return self.url
 
-    def set_info(self, info):
+    def set_info(self, info: Dict):
         self.info = info
-        
-    def get_info(self):
+
+    def get_info(self) -> Dict:
         return self.info
 
-    def set_videos(self, videos):
+    def set_videos(self, videos: Dict):
         self.videos = videos
 
-    def get_videos(self):
+    def get_videos(self) -> Dict:
         return self.videos
 
     def set_playlist_status(self, status):
@@ -40,16 +41,16 @@ class Get:
     def __init__(self):
         self.url = ''
 
-    def set_url(self):
+    def set_url(self)-> None:
         self.url = input("Enter URL: ")
 
     @staticmethod
-    def is_playlist(info):
+    def is_playlist(info: Dict):
         if info.get('entries') and isinstance(info.get('entries'), list):
             return True
         return False
 
-    def extract_info(self):
+    def extract_info(self) -> Data:
         options = {
             'quiet': True
         }
@@ -63,7 +64,8 @@ class Get:
 
         return data
 
-def extract_video_info(url):
+
+def extract_video_info(url: str) -> Dict:
     options = {
         'quiet': True
     }
@@ -71,81 +73,82 @@ def extract_video_info(url):
         info = ydl.extract_info(url, download=False)
 
     return info
-def get_formats(info) -> list:
 
+
+def get_formats(info: Dict) -> List:
     print("\nAvailable formats:")
     filtered_formats = []
     for i in range(len(info["formats"])):
         if 'ext' in info["formats"][i].keys() and info["formats"][i].get('ext') == 'mp4':
             if info["formats"][i].get('height') in [1080, 720, 480]:
                 filtered_formats.append(info["formats"][i])
-
-    for fmt in filtered_formats:
-        format_id = fmt.get('format_id')
-        resolution = fmt.get('resolution')
-        file_size = fmt.get('filesize')  # in bytes
-        size_in_mb = f"{file_size / (1024 * 1024):.2f} MB" if file_size else "Unknown size"
-        print(f"{format_id}: {resolution}, {size_in_mb}")
+                f_id = info["formats"][i].get('format_id')
+                resolution = info["formats"][i].get('resolution')
+                file_size = info["formats"][i].get('filesize')  # in bytes
+                size_in_mb = f"{file_size / (1024 * 1024):.2f} MB" if file_size else "Unknown size"
+                print(f"{f_id}: {resolution}, {size_in_mb}")
 
     return filtered_formats
 
-def sanitize_filename(name):
+
+def sanitize_filename(name: str) -> str:
     return re.sub(r'[<>:"/\\|?*]', '_', name)
 
-def download(url, format_id, video_number, save_dir, title):
-    sanitized_title = sanitize_filename(title)
-    ydl_opts = {
-        'format': format_id + "+bestaudio",  # Merge the best audio with selected video format
-        'quiet': False,
-        'merge_output_format': 'mp4',  # Output format for merged files
-        'outtmpl': os.path.join(save_dir, f"{video_number:02d}_{sanitized_title}.%(ext)s")  # Add index before sanitized title
-    }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-
-def check_format_availability(url, format_id):
+def check_format_availability(url: str, frmt_id: str) -> bool:
     ydl_opts = {
         'quiet': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
-        formats = [fmt['format_id'] for fmt in info['formats']]
-    return format_id in formats
+    return frmt_id in [fmt['format_id'] for fmt in info['formats']]
 
-def list_playlist_videos(info):
 
+def list_playlist_videos(info: Dict) -> Dict:
+    """
+
+    :param info: Dict
+    :return :
+
+    return type is a dictionary with keys as index and values is another dictionary
+    """
     print("\nPlaylist contents:")
     video_data = {}
-    for idx, entry in enumerate(info['entries'], start=1):
-        print(f"{idx}. {entry['title']}")
-        video_data[idx] = extract_video_info(entry['original_url'])
+    for i, entry in enumerate(info['entries'], start=1):
+        print(f"{i}. {entry['title']}")
+        video_data[i] = extract_video_info(entry['original_url'])
 
     return video_data
 
-def download_video(url, format_id, save_dir, idx, title):
 
+def download_video(url: str, format_idx, save_dir, video_number, title) -> None:
+    """
+    :type url: Dict
+    :type format_idx: str
+    :type save_dir: str
+    :type video_number: int
+    :type title: str
+    """
     sanitized_title = sanitize_filename(title)
     ydl_opts = {
-        'format': format_id + "+bestaudio",  # Merge the best audio with selected video format
+        'format': format_idx + "+bestaudio",
         'quiet': False,
-        'merge_output_format': 'mp4',  # Output format for merged files
-        'outtmpl': os.path.join(save_dir, f"{idx:02d}_{sanitized_title}.%(ext)s")  # Add index before sanitized title
+        'merge_output_format': 'mp4',
+        'outtmpl': os.path.join(save_dir, f"{video_number:02d}_{sanitized_title}.%(ext)s")
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
 
-def get_videos_to_download():
-
+def get_videos_to_download() -> List:
     videos_to_download = []
     try:
         videos = input("Enter index of video download. \nEnter comma separated values and range. \nEg: 1,2,3-7,12\n")
         for i in videos.split(','):
             if '-' in i:
                 start, end = map(int, i.split('-'))
-                videos_to_download.extend(range(start, end+1))
+                videos_to_download.extend(range(start, end + 1))
             elif not i:
                 continue
             else:
@@ -172,16 +175,14 @@ if __name__ == "__main__":
     to_download = get_videos_to_download()
     selected_videos = [data_object.videos[i] for i in to_download]
     print("\nSelect a resolution for video:")
-    # with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-    #     temp_info = ydl.extract_info(selected_videos[0], download=False)
-    # formats = get_formats(temp_info)
+
     formats = get_formats(selected_videos[0])
     if formats:
         format_id = input("Enter the format ID you wish to download: ")
     else:
         print("No suitable formats found.")
         sys.exit(0)
-    
+
     skipped_videos = []
     for idx, video_url in enumerate(selected_videos, start=1):
         video_title = data_object.videos[idx]['title']
