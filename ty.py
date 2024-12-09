@@ -90,7 +90,7 @@ def get_formats(info: Dict) -> List:
     filtered_formats = []
     for i in range(len(info["formats"])):
         if 'ext' in info["formats"][i].keys() and info["formats"][i].get('ext') == 'mp4':
-            if info["formats"][i].get('height') in [1080, 720, 480] or info['formats'][i].get('quality') in ['360', '720', '1080']:
+            if info["formats"][i].get('height') in [1440, 2160,1080, 720, 480] or info['formats'][i].get('quality') in ['360', '720', '1080']:
                 filtered_formats.append(info["formats"][i])
                 f_id = info["formats"][i].get('format_id')
                 resolution = info["formats"][i].get('resolution')
@@ -163,7 +163,7 @@ def list_playlist_videos(info: Dict) -> Dict:
 
 def download_video(url: str, format_idx, save_dir, video_number, title) -> None:
     """
-    :type url: Dict
+    :type url: str
     :type format_idx: str
     :type save_dir: str
     :type video_number: int
